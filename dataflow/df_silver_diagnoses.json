@@ -1,0 +1,87 @@
+{
+	"name": "df_silver_diagnoses",
+	"properties": {
+		"folder": {
+			"name": "Silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "Bronze_diagnoses_sql",
+						"type": "DatasetReference"
+					},
+					"name": "diagnoses"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "Silver_diagnoses_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derivedColumn1"
+				},
+				{
+					"name": "cast1"
+				},
+				{
+					"name": "filter1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          diagnosis_id as string,",
+				"          admission_id as string,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT b.*\\nFROM bronze.diagnoses b\\nWHERE TRY_CAST(b.admission_id AS INT) IN (SELECT admission_id FROM silver.admissions)',",
+				"     format: 'query') ~> diagnoses",
+				"diagnoses derive(diagnosis_id = toInteger(toString(diagnosis_id)),",
+				"          admission_id = toInteger(toString(admission_id)),",
+				"          icd_code = case(\r",
+				" upper(trim(severity))=='MILD','Mild',\r",
+				" upper(trim(severity))=='MODERATE','Moderate',\r",
+				" upper(trim(severity))=='SEVERE','Severe',\r",
+				" upper(trim(severity))=='CRITICAL','Critical',\r",
+				" toString(null())),",
+				"          diagnosis_description = trim(toString(diagnosis_description)),",
+				"          severity = upper(trim(toString(severity)))) ~> derivedColumn1",
+				"derivedColumn1 cast(output(",
+				"          diagnosis_id as integer,",
+				"          admission_id as integer",
+				"     ),",
+				"     errors: true) ~> cast1",
+				"cast1 filter(!isNull(diagnosis_id) && !isNull(admission_id) && !isNull(icd_code)) ~> filter1",
+				"filter1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          diagnosis_id as integer,",
+				"          admission_id as integer,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> sink1"
+			]
+		}
+	}
+}

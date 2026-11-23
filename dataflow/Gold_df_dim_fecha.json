@@ -1,0 +1,79 @@
+{
+	"name": "Gold_df_dim_fecha",
+	"properties": {
+		"folder": {
+			"name": "Gold"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "Silver_admissions_sql",
+						"type": "DatasetReference"
+					},
+					"name": "dimFecha"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "Gold_dim_fecha",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          fecha_key as integer,",
+				"          fecha_completa as date,",
+				"          anio as short,",
+				"          trimestre as integer,",
+				"          trimestre_nombre as string,",
+				"          mes as integer,",
+				"          mes_nombre as string,",
+				"          mes_corto as string,",
+				"          semana_anio as integer,",
+				"          dia_mes as integer,",
+				"          dia_semana as integer,",
+				"          dia_nombre as string,",
+				"          es_fin_de_semana as boolean",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT\\n    CONVERT(INT, FORMAT(f.fecha, \\'yyyyMMdd\\')) AS fecha_key,\\n    f.fecha AS fecha_completa,\\n    CAST(YEAR(f.fecha) AS SMALLINT) AS anio,\\n    CAST(DATEPART(QUARTER, f.fecha) AS TINYINT) AS trimestre,\\n    \\'T\\' + CAST(DATEPART(QUARTER, f.fecha) AS VARCHAR(1)) AS trimestre_nombre,\\n    CAST(MONTH(f.fecha) AS TINYINT) AS mes,\\n    CASE MONTH(f.fecha)\\n        WHEN 1 THEN \\'Enero\\' WHEN 2 THEN \\'Febrero\\' WHEN 3 THEN \\'Marzo\\' WHEN 4 THEN \\'Abril\\'\\n        WHEN 5 THEN \\'Mayo\\' WHEN 6 THEN \\'Junio\\' WHEN 7 THEN \\'Julio\\' WHEN 8 THEN \\'Agosto\\'\\n        WHEN 9 THEN \\'Septiembre\\' WHEN 10 THEN \\'Octubre\\' WHEN 11 THEN \\'Noviembre\\' WHEN 12 THEN \\'Diciembre\\'\\n    END AS mes_nombre,\\n    CASE MONTH(f.fecha)\\n        WHEN 1 THEN \\'Ene\\' WHEN 2 THEN \\'Feb\\' WHEN 3 THEN \\'Mar\\' WHEN 4 THEN \\'Abr\\'\\n        WHEN 5 THEN \\'May\\' WHEN 6 THEN \\'Jun\\' WHEN 7 THEN \\'Jul\\' WHEN 8 THEN \\'Ago\\'\\n        WHEN 9 THEN \\'Sep\\' WHEN 10 THEN \\'Oct\\' WHEN 11 THEN \\'Nov\\' WHEN 12 THEN \\'Dic\\'\\n    END AS mes_corto,\\n    CAST(DATEPART(ISO_WEEK, f.fecha) AS TINYINT) AS semana_anio,\\n    CAST(DAY(f.fecha) AS TINYINT) AS dia_mes,\\n    CAST(d.dsn AS TINYINT) AS dia_semana,\\n    CASE d.dsn\\n        WHEN 1 THEN \\'Lunes\\' WHEN 2 THEN \\'Martes\\' WHEN 3 THEN \\'Miércoles\\' WHEN 4 THEN \\'Jueves\\'\\n        WHEN 5 THEN \\'Viernes\\' WHEN 6 THEN \\'Sábado\\' WHEN 7 THEN \\'Domingo\\'\\n    END AS dia_nombre,\\n    CAST(CASE WHEN d.dsn IN (6, 7) THEN 1 ELSE 0 END AS BIT) AS es_fin_de_semana\\nFROM (\\n    SELECT admission_date AS fecha FROM silver.admissions WHERE admission_date IS NOT NULL\\n    UNION\\n    SELECT discharge_date FROM silver.admissions WHERE discharge_date IS NOT NULL\\n    UNION\\n    SELECT payment_date FROM silver.billing WHERE payment_date IS NOT NULL\\n) f\\nCROSS APPLY (\\n    SELECT (((DATEPART(WEEKDAY, f.fecha) + @@DATEFIRST - 2) % 7) + 1) AS dsn\\n) d',",
+				"     format: 'query') ~> dimFecha",
+				"dimFecha sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          fecha_key as integer,",
+				"          fecha_completa as date,",
+				"          anio as integer,",
+				"          trimestre as integer,",
+				"          trimestre_nombre as string,",
+				"          mes as integer,",
+				"          mes_nombre as string,",
+				"          mes_corto as string,",
+				"          semana_anio as integer,",
+				"          dia_mes as integer,",
+				"          dia_semana as integer,",
+				"          dia_nombre as string,",
+				"          es_fin_de_semana as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'allErrors',",
+				"     transactionCommit: 'single',",
+				"     reportSuccessOnError: false) ~> sink1"
+			]
+		}
+	}
+}

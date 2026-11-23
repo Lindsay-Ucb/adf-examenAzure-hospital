@@ -1,0 +1,72 @@
+{
+	"name": "Gold_df_fact_admisiones",
+	"properties": {
+		"folder": {
+			"name": "Gold"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "Silver_admissions_sql",
+						"type": "DatasetReference"
+					},
+					"name": "factAdmisiones"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "Gold_fact_admisiones",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          diagnostico_key as integer,",
+				"          fecha_ingreso_key as integer,",
+				"          fecha_alta_key as integer,",
+				"          medico_id as integer,",
+				"          dias_estancia as integer,",
+				"          conteo_admisiones as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: ' SELECT a.admission_id AS admission_id_bk, pk.paciente_key, dk.departamento_key,\\n  dxk.diagnostico_key, fi.fecha_key AS fecha_ingreso_key, fa.fecha_key AS fecha_alta_key,\\n  a.attending_doctor_id AS medico_id,\\n  CASE WHEN a.discharge_date IS NOT NULL THEN DATEDIFF(DAY,a.admission_date,a.discharge_date) END AS dias_estancia,\\n  1 AS conteo_admisiones\\nFROM silver.admissions a\\nJOIN silver.diagnoses dx ON dx.admission_id = a.admission_id\\nLEFT JOIN gold.dim_paciente pk ON pk.patient_id_bk = a.patient_id\\nLEFT JOIN gold.dim_departamento dk ON dk.nombre_departamento = a.department\\nLEFT JOIN gold.dim_diagnostico dxk ON dxk.codigo_icd = dx.icd_code\\n  AND dxk.nivel_severidad = ISNULL(dx.severity,\\'No Determinada\\')\\nLEFT JOIN gold.dim_fecha fi ON fi.fecha_key = CONVERT(INT, FORMAT(a.admission_date,\\'yyyyMMdd\\'))\\nLEFT JOIN gold.dim_fecha fa ON fa.fecha_key = CONVERT(INT, FORMAT(a.discharge_date,\\'yyyyMMdd\\'))',",
+				"     format: 'query') ~> factAdmisiones",
+				"factAdmisiones sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          admision_key as long,",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          diagnostico_key as integer,",
+				"          fecha_ingreso_key as integer,",
+				"          fecha_alta_key as integer,",
+				"          medico_id as integer,",
+				"          dias_estancia as integer,",
+				"          conteo_admisiones as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'allErrors',",
+				"     transactionCommit: 'single',",
+				"     reportSuccessOnError: false) ~> sink1"
+			]
+		}
+	}
+}
