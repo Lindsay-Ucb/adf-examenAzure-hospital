@@ -1,0 +1,106 @@
+{
+	"name": "df_silver_patients",
+	"properties": {
+		"folder": {
+			"name": "Silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "Bronze_patients_sql",
+						"type": "DatasetReference"
+					},
+					"name": "patients"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "Silver_patients_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derivedColumn1"
+				},
+				{
+					"name": "derivedColumn2"
+				},
+				{
+					"name": "cast1"
+				},
+				{
+					"name": "filter1"
+				},
+				{
+					"name": "derivedColumn3"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          patient_id as string,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as string,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> patients",
+				"patients derive(patient_id = toInteger(toString(patient_id)),",
+				"          full_name = trim(toString(full_name))) ~> derivedColumn1",
+				"derivedColumn1 derive(gender = iif(lower(trim(gender)) == 'm' || lower(trim(gender)) == 'male', 'M', iif(lower(trim(gender)) == 'f' || lower(trim(gender)) == 'female', 'F', trim(gender))),",
+				"          date_of_birth = coalesce(\r",
+				"    toDate(date_of_birth, 'yyyy-MM-dd'),\r",
+				"    toDate(date_of_birth, 'MM/dd/yyyy'),\r",
+				"    toDate(date_of_birth, 'MM-dd-yy'),\r",
+				"    toDate(date_of_birth, 'dd-MMM-yyyy'),\r",
+				"    toDate(date_of_birth, 'MMMM dd, yyyy')\r",
+				"),",
+				"          email = replace(     replace(         replace(lower(trim(email)), ',com', '.com'),      ' at ', '@'), ' ', '')) ~> derivedColumn2",
+				"derivedColumn3 cast(output(",
+				"          date_of_birth as date 'dd/MM/yyyy'",
+				"     ),",
+				"     errors: true) ~> cast1",
+				"cast1 filter(!isNull(patient_id) && !isNull(full_name) && trim(full_name) != '') ~> filter1",
+				"derivedColumn2 derive(phone = iif(isNull(phone) || phone == 'unknown', \r",
+				"    toString(null()), \r",
+				"    regexReplace(\r",
+				"        regexReplace(phone, '[^0-9]', ''), \r",
+				"        '(\\\\d{3})(\\\\d{3})(\\\\d{4})', \r",
+				"        '$1-$2-$3'\r",
+				"    )\r",
+				")) ~> derivedColumn3",
+				"filter1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          patient_id as integer,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as date,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> sink1"
+			]
+		}
+	}
+}
